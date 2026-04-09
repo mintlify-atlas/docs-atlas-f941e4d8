@@ -1,0 +1,336 @@
+---
+title: "Authentication"
+description: "Add authentication to your app integration using API key or OAuth."
+---
+
+<Info>
+  The build integrations section is best understood when read from beginning to end. Start from the first page and work through each one in order.
+
+  1. [Folder structure](/build-integrations/folder-structure)
+  2. [App](/build-integrations/app)
+  3. [Global variable](/build-integrations/global-variable)
+  4. **Auth** (you are here)
+  5. [Triggers](/build-integrations/triggers)
+  6. [Actions](/build-integrations/actions)
+  7. [Examples](/build-integrations/examples)
+</Info>
+
+Automatisch supports two common authentication patterns: API key auth and 3-legged OAuth. Both share the same `auth` object structure but differ in their fields and methods.
+
+<Warning>
+  If the third-party service supports both an API key and OAuth, use OAuth. Pull requests that use API key auth when OAuth is available will be asked to switch.
+</Warning>
+
+## Add auth to the app
+
+Open your app's `index.js` and import the `auth` module.
+
+```javascript
+import defineApp from '../../helpers/define-app.js';
+import auth from './auth/index.js';
+
+export default defineApp({
+  name: 'The cat API',
+  key: 'thecatapi',
+  iconUrl: '{BASE_URL}/apps/thecatapi/assets/favicon.svg',
+  authDocUrl: '{DOCS_URL}/apps/thecatapi/connection',
+  supportsConnections: true,
+  baseUrl: 'https://thecatapi.com',
+  apiBaseUrl: 'https://api.thecatapi.com',
+  primaryColor: '#000000',
+  auth,
+});
+```
+
+## Auth patterns
+
+<Tabs>
+  <Tab title="API key auth">
+    API key auth collects a key from the user and validates it against the API.
+
+    ### Create the auth folder
+
+    ```bash
+    mkdir auth
+    touch auth/index.js
+    touch auth/verify-credentials.js
+    touch auth/is-still-verified.js
+    ```
+
+    ### Define auth fields
+
+    In `auth/index.js`, export an object with the `fields` array and the two required methods.
+
+    ```javascript
+    import verifyCredentials from './verify-credentials.js';
+    import isStillVerified from './is-still-verified.js';
+
+    export default {
+      fields: [
+        {
+          key: 'screenName',
+          label: 'Screen Name',
+          type: 'string',
+          required: true,
+          readOnly: false,
+          value: null,
+          placeholder: null,
+          description:
+            'Screen name of your connection to be used on Automatisch UI.',
+          clickToCopy: false,
+        },
+        {
+          key: 'apiKey',
+          label: 'API Key',
+          type: 'string',
+          required: true,
+          readOnly: false,
+          value: null,
+          placeholder: null,
+          description: 'API key of the cat API service.',
+          clickToCopy: false,
+        },
+      ],
+
+      verifyCredentials,
+      isStillVerified,
+    };
+    ```
+
+    <Warning>
+      You must include a `screenName` field when there is no API endpoint that returns a username or user identifier. The screen name is displayed in the Automatisch UI to label the connection.
+    </Warning>
+
+    ### Implement verifyCredentials
+
+    `verifyCredentials` is called when the user saves a new connection. Make a request to the API to confirm the key is valid, then call `$.auth.set()` to persist the credential data.
+
+    ```javascript
+    const verifyCredentials = async ($) => {
+      await $.http.get('/v1/images/search');
+
+      await $.auth.set({
+        screenName: $.auth.data.screenName,
+      });
+    };
+
+    export default verifyCredentials;
+    ```
+
+    <Warning>
+      You must always call `$.auth.set()` and include a `screenName` in `verifyCredentials`. Without it, the connection will not display a name and will not function correctly.
+    </Warning>
+
+    ### Implement isStillVerified
+
+    `isStillVerified` is called by the test connection functionality. It must return a truthy value when the credentials are still valid.
+
+    ```javascript
+    import verifyCredentials from './verify-credentials.js';
+
+    const isStillVerified = async ($) => {
+      await verifyCredentials($);
+      return true;
+    };
+
+    export default isStillVerified;
+    ```
+
+    <Info>
+      `isStillVerified` must return a truthy value when the credentials are valid. If they are not, throw an error — Automatisch will handle it automatically.
+    </Info>
+  </Tab>
+
+  <Tab title="OAuth (3-legged)">
+    3-legged OAuth redirects the user to the third-party service to authorize access. The app receives an authorization code that it exchanges for an access token.
+
+    ### Create the auth folder
+
+    ```bash
+    mkdir auth
+    touch auth/index.js
+    touch auth/generate-auth-url.js
+    touch auth/verify-credentials.js
+    touch auth/is-still-verified.js
+    ```
+
+    ### Define auth fields
+
+    OAuth apps typically require the user to provide a Client ID and Client Secret from the third-party developer portal. Include a read-only redirect URL field that the user copies into the third-party app settings.
+
+    ```javascript
+    import generateAuthUrl from './generate-auth-url.js';
+    import verifyCredentials from './verify-credentials.js';
+    import isStillVerified from './is-still-verified.js';
+
+    export default {
+      fields: [
+        {
+          key: 'oAuthRedirectUrl',
+          label: 'OAuth Redirect URL',
+          type: 'string',
+          required: true,
+          readOnly: true,
+          value: '{WEB_APP_URL}/app/github/connections/add',
+          placeholder: null,
+          description:
+            'When asked to input an OAuth callback or redirect URL in Github OAuth, enter the URL above.',
+          docUrl: 'https://automatisch.io/docs/github#oauth-redirect-url',
+          clickToCopy: true,
+        },
+        {
+          key: 'consumerKey',
+          label: 'Client ID',
+          type: 'string',
+          required: true,
+          readOnly: false,
+          value: null,
+          placeholder: null,
+          description: null,
+          docUrl: 'https://automatisch.io/docs/github#client-id',
+          clickToCopy: false,
+        },
+        {
+          key: 'consumerSecret',
+          label: 'Client Secret',
+          type: 'string',
+          required: true,
+          readOnly: false,
+          value: null,
+          placeholder: null,
+          description: null,
+          docUrl: 'https://automatisch.io/docs/github#client-secret',
+          clickToCopy: false,
+        },
+      ],
+
+      generateAuthUrl,
+      verifyCredentials,
+      isStillVerified,
+    };
+    ```
+
+    ### Implement generateAuthUrl
+
+    `generateAuthUrl` builds the authorization URL and saves it to `$.auth`. Automatisch redirects the user to this URL to begin the OAuth flow.
+
+    ```javascript
+    import { URLSearchParams } from 'url';
+
+    export default async function generateAuthUrl($) {
+      const scopes = ['read:org', 'repo', 'user'];
+      const oauthRedirectUrlField = $.app.auth.fields.find(
+        (field) => field.key == 'oAuthRedirectUrl'
+      );
+      const redirectUri = oauthRedirectUrlField.value;
+      const searchParams = new URLSearchParams({
+        client_id: $.auth.data.consumerKey,
+        redirect_uri: redirectUri,
+        scope: scopes.join(','),
+      });
+
+      const url = `${
+        $.app.baseUrl
+      }/login/oauth/authorize?${searchParams.toString()}`;
+
+      await $.auth.set({
+        url,
+      });
+    }
+    ```
+
+    ### Implement verifyCredentials
+
+    After the user authorizes the app, Automatisch calls `verifyCredentials` with the authorization code. Exchange the code for an access token, then fetch user info to set the `screenName`.
+
+    ```javascript
+    import getCurrentUser from '../common/get-current-user.js';
+
+    const verifyCredentials = async ($) => {
+      const response = await $.http.post(
+        `${$.app.baseUrl}/login/oauth/access_token`,
+        {
+          client_id: $.auth.data.consumerKey,
+          client_secret: $.auth.data.consumerSecret,
+          code: $.auth.data.code,
+        },
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      const data = response.data;
+
+      $.auth.data.accessToken = data.access_token;
+
+      const currentUser = await getCurrentUser($);
+
+      await $.auth.set({
+        consumerKey: $.auth.data.consumerKey,
+        consumerSecret: $.auth.data.consumerSecret,
+        accessToken: data.access_token,
+        scope: data.scope,
+        tokenType: data.token_type,
+        userId: currentUser.id,
+        screenName: currentUser.login,
+      });
+    };
+
+    export default verifyCredentials;
+    ```
+
+    ### Implement isStillVerified
+
+    `isStillVerified` checks that the stored access token still grants access. Return a truthy value when it does.
+
+    ```javascript
+    import getCurrentUser from '../common/get-current-user.js';
+
+    const isStillVerified = async ($) => {
+      const user = await getCurrentUser($);
+      return !!user.id;
+    };
+
+    export default isStillVerified;
+    ```
+
+    <Tip>
+      See the [Examples](/build-integrations/examples) page for a list of existing apps that use 3-legged OAuth, including GitHub, Slack, Discord, and Flickr.
+    </Tip>
+  </Tab>
+</Tabs>
+
+## Auth object fields reference
+
+<ParamField path="fields" type="array" required>
+  An array of field objects that define what the user must enter to create a connection.
+
+  Each field supports the following properties:
+
+  | Property | Type | Description |
+  |---|---|---|
+  | `key` | string | Unique identifier for the field. Access the value at `$.auth.data.<key>`. |
+  | `label` | string | Label shown in the Automatisch UI. |
+  | `type` | string | Input type. Use `'string'` for text fields. |
+  | `required` | boolean | Whether the field must be filled in. |
+  | `readOnly` | boolean | When `true`, the field is displayed but not editable. Useful for redirect URLs. |
+  | `value` | any | Default value for the field. |
+  | `placeholder` | string | Placeholder text shown inside the input. |
+  | `description` | string | Help text shown below the field. |
+  | `clickToCopy` | boolean | When `true`, the field shows a copy-to-clipboard button. |
+  | `docUrl` | string | Optional link to external documentation for the field. |
+</ParamField>
+
+<ParamField path="verifyCredentials" type="function" required>
+  Called when the user saves a new connection. Must call `$.auth.set()` with at least a `screenName`. Throws an error if credentials are invalid.
+</ParamField>
+
+<ParamField path="isStillVerified" type="function" required>
+  Called by the test connection feature. Must return a truthy value if the credentials are still valid, or throw an error if they are not.
+</ParamField>
+
+<ParamField path="generateAuthUrl" type="function">
+  Required for OAuth apps. Builds the authorization URL and saves it to `$.auth` so Automatisch can redirect the user to begin the OAuth flow.
+</ParamField>

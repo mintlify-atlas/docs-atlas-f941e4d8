@@ -1,0 +1,138 @@
+---
+title: 'Configuration'
+description: 'Configure Automatisch using environment variables. Learn which variables are required, what each one does, and how to set them in your docker-compose.yml.'
+---
+
+Automatisch is configured entirely through environment variables. The recommended way to set them is in your `docker-compose.yml` file.
+
+## Setting environment variables
+
+Open `docker-compose.yml` and add or update variables under the `environment` key for both the `main` and `worker` services. Most variables need to be present in both services because they share the same configuration.
+
+```yaml docker-compose.yml
+services:
+  main:
+    environment:
+      - HOST=localhost
+      - PROTOCOL=http
+      - PORT=3000
+      - APP_ENV=production
+      - ENCRYPTION_KEY=your-encryption-key
+      - WEBHOOK_SECRET_KEY=your-webhook-secret
+      - APP_SECRET_KEY=your-app-secret
+      # ... other variables
+  worker:
+    environment:
+      - APP_ENV=production
+      - ENCRYPTION_KEY=your-encryption-key
+      - WEBHOOK_SECRET_KEY=your-webhook-secret
+      - APP_SECRET_KEY=your-app-secret
+      - WORKER=true
+      # ... other variables
+```
+
+<Warning>
+The default values shown below reflect the docker-compose setup, which is the recommended way to run Automatisch. Values may differ in a local development environment.
+</Warning>
+
+<Warning>
+**Changing `ENCRYPTION_KEY` will break all existing connections.** This key encrypts credentials stored for third-party services. If you rotate it after setup, Automatisch can no longer decrypt those credentials and every connection will stop working. Set it once during initial setup and never change it. The same applies to `WEBHOOK_SECRET_KEY` — changing it invalidates all active webhook flows.
+</Warning>
+
+---
+
+## Application
+
+Variables that control the core HTTP server and runtime behavior.
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `HOST` | string | `localhost` | Hostname the HTTP server binds to. |
+| `PROTOCOL` | string | `http` | Protocol used to build internal URLs (`http` or `https`). |
+| `PORT` | string | `3000` | Port the HTTP server listens on. |
+| `APP_ENV` | string | `production` | Runtime environment. Use `production` for deployed instances. |
+| `WEB_APP_URL` | string | — | Override the URL used for CORS and connection redirects. Useful when the frontend is served from a different origin. |
+| `WEBHOOK_URL` | string | — | Override the base URL used when registering webhooks with third-party services. |
+| `LOG_LEVEL` | string | `info` | Log verbosity. Accepted values: `error`, `warn`, `info`, `http`, `debug`. |
+| `DISABLE_NOTIFICATIONS_PAGE` | boolean | `false` | Hide the notifications page in the UI. |
+| `DISABLE_FAVICON` | boolean | `false` | Disable the favicon served by the app. |
+| `SERVE_WEB_APP_SEPARATELY` | boolean | `false` | When `true`, the backend does not serve the frontend static files. Use this when the frontend is served by a separate process (e.g., during local development). |
+
+---
+
+## Database (PostgreSQL)
+
+Automatisch stores all application data — users, flows, connections, and executions — in PostgreSQL.
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `POSTGRES_HOST` | string | `postgres` | Hostname of the PostgreSQL server. |
+| `POSTGRES_PORT` | number | `5432` | Port PostgreSQL listens on. |
+| `POSTGRES_DATABASE` | string | `automatisch` | Name of the database to connect to. |
+| `POSTGRES_SCHEMA` | string | `public` | Schema within the database. |
+| `POSTGRES_USERNAME` | string | `automatisch_user` | Database user. |
+| `POSTGRES_PASSWORD` | string | — | Password for the database user. |
+| `POSTGRES_ENABLE_SSL` | boolean | `false` | Enable TLS/SSL for the database connection. Required by some managed PostgreSQL providers. |
+
+---
+
+## Redis
+
+Redis is used as the job queue backend for background workers.
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `REDIS_HOST` | string | `redis` | Hostname of the Redis server. |
+| `REDIS_PORT` | number | `6379` | Port Redis listens on. |
+| `REDIS_DB` | number | — | Redis logical database index to use. |
+| `REDIS_USERNAME` | string | — | Redis username (required for Redis 6+ ACLs). |
+| `REDIS_PASSWORD` | string | — | Redis password. |
+| `REDIS_TLS` | boolean | `false` | Enable TLS for the Redis connection. |
+
+---
+
+## Security
+
+<Warning>
+`ENCRYPTION_KEY`, `WEBHOOK_SECRET_KEY`, and `APP_SECRET_KEY` are critical security variables. Set strong, random values for all three before your first deployment. **Never change `ENCRYPTION_KEY` after setup** — doing so permanently breaks all stored credentials.
+</Warning>
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `ENCRYPTION_KEY` | string | — | **Required.** Key used to encrypt and decrypt third-party credentials stored in the database. Must be set before any connections are created. |
+| `WEBHOOK_SECRET_KEY` | string | — | **Required.** Key used to sign and verify incoming webhook payloads. |
+| `APP_SECRET_KEY` | string | — | **Required.** Secret used to sign user session tokens. |
+
+Generate strong values for each with a command like:
+
+```bash
+openssl rand -hex 32
+```
+
+---
+
+## Email (SMTP)
+
+Configure SMTP to enable email notifications and password reset emails. All SMTP variables are optional — if omitted, email features are disabled.
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `SMTP_HOST` | string | — | Hostname of your SMTP server. |
+| `SMTP_PORT` | string | `587` | SMTP port. Common values: `587` (STARTTLS), `465` (SSL), `25` (plain). |
+| `SMTP_SECURE` | boolean | `false` | Use SSL/TLS for the SMTP connection. Set to `true` when using port 465. |
+| `SMTP_USER` | string | — | SMTP username for authentication. |
+| `SMTP_PASSWORD` | string | — | SMTP password for authentication. |
+| `FROM_EMAIL` | string | — | Email address that appears in the `From` field of outgoing messages. |
+
+---
+
+## Monitoring
+
+Variables for queue visibility and anonymous usage data.
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `TELEMETRY_ENABLED` | boolean | `true` | Send anonymous usage statistics to the Automatisch team. See [Telemetry](/advanced/telemetry) for details on what is collected and how to disable it. |
+| `ENABLE_BULLMQ_DASHBOARD` | boolean | `false` | Enable the BullMQ web dashboard for inspecting job queues. |
+| `BULLMQ_DASHBOARD_USERNAME` | string | — | Username to protect the BullMQ dashboard with HTTP basic auth. Required when `ENABLE_BULLMQ_DASHBOARD` is `true`. |
+| `BULLMQ_DASHBOARD_PASSWORD` | string | — | Password for the BullMQ dashboard. Required when `ENABLE_BULLMQ_DASHBOARD` is `true`. |

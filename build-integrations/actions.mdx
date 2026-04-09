@@ -1,0 +1,276 @@
+---
+title: "Actions"
+description: "Define actions that perform operations in a third-party service as part of a workflow."
+---
+
+<Info>
+  The build integrations section is best understood when read from beginning to end. Start from the first page and work through each one in order.
+
+  1. [Folder structure](/build-integrations/folder-structure)
+  2. [App](/build-integrations/app)
+  3. [Global variable](/build-integrations/global-variable)
+  4. [Auth](/build-integrations/auth)
+  5. [Triggers](/build-integrations/triggers)
+  6. **Actions** (you are here)
+  7. [Examples](/build-integrations/examples)
+</Info>
+
+An action is a step in a workflow that performs an operation in a third-party service — sending a message, creating a record, posting data — and returns a result that subsequent steps can use.
+
+## Add actions to the app
+
+Open your app's `index.js` and import the actions module.
+
+```javascript
+import defineApp from '../../helpers/define-app.js';
+import auth from './auth/index.js';
+import triggers from './triggers/index.js';
+import actions from './actions/index.js';
+
+export default defineApp({
+  name: 'The cat API',
+  key: 'thecatapi',
+  iconUrl: '{BASE_URL}/apps/thecatapi/assets/favicon.svg',
+  authDocUrl: '{DOCS_URL}/apps/thecatapi/connection',
+  supportsConnections: true,
+  baseUrl: 'https://thecatapi.com',
+  apiBaseUrl: 'https://api.thecatapi.com',
+  primaryColor: '#000000',
+  auth,
+  triggers,
+  actions,
+});
+```
+
+## Create an action
+
+<Steps>
+  <Step title="Create the actions index">
+    Create `actions/index.js` and export your actions as an array.
+
+    ```javascript
+    import markCatImageAsFavorite from './mark-cat-image-as-favorite/index.js';
+
+    export default [markCatImageAsFavorite];
+    ```
+
+    <Tip>
+      Add each new action to this array. The order here determines the order actions appear in the Automatisch UI.
+    </Tip>
+  </Step>
+
+  <Step title="Add the action metadata">
+    Create `actions/mark-cat-image-as-favorite/index.js` with the action definition.
+
+    ```javascript
+    import defineAction from '../../../../helpers/define-action.js';
+
+    export default defineAction({
+      name: 'Mark the cat image as favorite',
+      key: 'markCatImageAsFavorite',
+      description: 'Marks the cat image as favorite.',
+      arguments: [
+        {
+          label: 'Image ID',
+          key: 'imageId',
+          type: 'string',
+          required: true,
+          description: 'The ID of the cat image you want to mark as favorite.',
+          variables: true,
+        },
+      ],
+
+      async run($) {
+        // TODO: Implement action!
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Implement the run function">
+    Access user-supplied parameters via `$.step.parameters`, make an HTTP request, and call `$.setActionItem()` with the result.
+
+    ```javascript
+    import defineAction from '../../../../helpers/define-action.js';
+
+    export default defineAction({
+      name: 'Mark the cat image as favorite',
+      key: 'markCatImageAsFavorite',
+      description: 'Marks the cat image as favorite.',
+      arguments: [
+        {
+          label: 'Image ID',
+          key: 'imageId',
+          type: 'string',
+          required: true,
+          description: 'The ID of the cat image you want to mark as favorite.',
+          variables: true,
+        },
+      ],
+
+      async run($) {
+        const requestPath = '/v1/favourites';
+        const imageId = $.step.parameters.imageId;
+
+        const headers = {
+          'x-api-key': $.auth.data.apiKey,
+        };
+
+        const response = await $.http.post(
+          requestPath,
+          { image_id: imageId },
+          { headers }
+        );
+
+        $.setActionItem({ raw: response.data });
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Test the action">
+    Go to the flows page in Automatisch and create a flow with the **Search cat images** trigger followed by the **Mark the cat image as favorite** action. Set an image ID as the argument and click **Test & Continue**. A JSON response in the UI confirms the action is working.
+  </Step>
+</Steps>
+
+## Action config fields reference
+
+<ParamField path="name" type="string" required>
+  The display name of the action shown in the Automatisch UI.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  A unique camelCase identifier for the action used internally by Automatisch.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  A short description of what the action does. Shown in the UI below the action name.
+</ParamField>
+
+<ParamField path="arguments" type="array" required>
+  An array of input field definitions. These are the values the user provides when configuring the action step in a workflow.
+</ParamField>
+
+<ParamField path="run" type="function" required>
+  The function called when the action executes. Access step parameters via `$.step.parameters`. Call `$.setActionItem()` with the result.
+</ParamField>
+
+## Arguments field reference
+
+Each item in the `arguments` array defines one user input.
+
+<ParamField path="label" type="string" required>
+  The label shown in the Automatisch UI for this input.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  The identifier for this argument. Access its value in `run` via `$.step.parameters.<key>`.
+</ParamField>
+
+<ParamField path="type" type="string" required>
+  The input type. Common values: `'string'`, `'dropdown'`.
+</ParamField>
+
+<ParamField path="required" type="boolean" required>
+  Whether the user must provide a value for this argument.
+</ParamField>
+
+<ParamField path="description" type="string">
+  Help text shown below the input in the UI.
+</ParamField>
+
+<ParamField path="variables" type="boolean">
+  When `true`, the user can map dynamic values from previous steps into this field. Set to `true` for fields that should accept output from earlier workflow steps.
+</ParamField>
+
+<ParamField path="value" type="any">
+  Default value for the argument.
+</ParamField>
+
+<ParamField path="options" type="array">
+  For `dropdown` type. A static list of `{ label, value }` objects to display as options.
+</ParamField>
+
+<ParamField path="source" type="object">
+  For `dropdown` type. A dynamic data source definition. Used when options should be fetched from the API at runtime.
+</ParamField>
+
+## Accessing parameters and setting the result
+
+Inside the `run` function, use `$.step.parameters` to read user-supplied argument values by their `key`.
+
+```javascript
+const imageId = $.step.parameters.imageId;
+const title = $.step.parameters.title;
+```
+
+Call `$.setActionItem()` with the API response data so Automatisch stores the result and makes it available to subsequent steps.
+
+```javascript
+$.setActionItem({ raw: response.data });
+```
+
+## More complex example
+
+The GitHub `Create issue` action shows how to use multiple arguments including a dynamic dropdown, validate required parameters, and construct an API request.
+
+```javascript
+import defineAction from '../../../../helpers/define-action.js';
+import getRepoOwnerAndRepo from '../../common/get-repo-owner-and-repo.js';
+
+export default defineAction({
+  name: 'Create issue',
+  key: 'createIssue',
+  description: 'Creates a new issue.',
+  arguments: [
+    {
+      label: 'Repo',
+      key: 'repo',
+      type: 'dropdown',
+      required: true,
+      variables: true,
+      source: {
+        type: 'query',
+        name: 'getDynamicData',
+        arguments: [
+          {
+            name: 'key',
+            value: 'listRepos',
+          },
+        ],
+      },
+    },
+    {
+      label: 'Title',
+      key: 'title',
+      type: 'string',
+      required: true,
+      variables: true,
+    },
+    {
+      label: 'Body',
+      key: 'body',
+      type: 'string',
+      required: true,
+      variables: true,
+    },
+  ],
+
+  async run($) {
+    const repoParameter = $.step.parameters.repo;
+    const title = $.step.parameters.title;
+    const body = $.step.parameters.body;
+
+    if (!repoParameter) throw new Error('A repo must be set!');
+    if (!title) throw new Error('A title must be set!');
+
+    const { repoOwner, repo } = getRepoOwnerAndRepo(repoParameter);
+    const response = await $.http.post(`/repos/${repoOwner}/${repo}/issues`, {
+      title,
+      body,
+    });
+
+    $.setActionItem({ raw: response.data });
+  },
+});
+```

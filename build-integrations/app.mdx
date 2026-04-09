@@ -1,0 +1,169 @@
+---
+title: "Define an app"
+description: "Create the app definition that registers your integration with Automatisch."
+---
+
+<Info>
+  The build integrations section is best understood when read from beginning to end. Start from the first page and work through each one in order.
+
+  1. [Folder structure](/build-integrations/folder-structure)
+  2. **App** (you are here)
+  3. [Global variable](/build-integrations/global-variable)
+  4. [Auth](/build-integrations/auth)
+  5. [Triggers](/build-integrations/triggers)
+  6. [Actions](/build-integrations/actions)
+  7. [Examples](/build-integrations/examples)
+</Info>
+
+Let's start building a first app using [TheCatApi](https://thecatapi.com/) as an example. It's a service that provides cat images and lets you vote on or favorite specific images. It demonstrates how Automatisch works with an API that has authentication and paginated data fetching.
+
+We'll build an app with a `Search cat images` trigger and a `Mark the cat image as favorite` action, covering both triggers and actions.
+
+## Create the app
+
+<Steps>
+  <Step title="Create the app folder">
+    Create a folder inside `packages/backend/src/apps` for your integration.
+
+    ```bash
+    cd packages/backend/src/apps
+    mkdir thecatapi
+    ```
+  </Step>
+
+  <Step title="Create the entry file">
+    Create an `index.js` file inside the `thecatapi` folder.
+
+    ```bash
+    cd thecatapi
+    touch index.js
+    ```
+  </Step>
+
+  <Step title="Define the app">
+    Add the app definition to `index.js` using `defineApp()`.
+
+    ```javascript
+    import defineApp from '../../helpers/define-app.js';
+
+    export default defineApp({
+      name: 'The cat API',
+      key: 'thecatapi',
+      iconUrl: '{BASE_URL}/apps/thecatapi/assets/favicon.svg',
+      authDocUrl: '{DOCS_URL}/apps/thecatapi/connection',
+      supportsConnections: true,
+      baseUrl: 'https://thecatapi.com',
+      apiBaseUrl: 'https://api.thecatapi.com',
+      primaryColor: '#000000',
+    });
+    ```
+  </Step>
+
+  <Step title="Create the favicon">
+    Create an `assets` folder inside `thecatapi` and save your icon as `favicon.svg`.
+
+    ```bash
+    mkdir assets
+    touch assets/favicon.svg
+    ```
+
+    <Tip>
+      Looking for SVG icons for third-party services? Check these repositories:
+      - [gilbarbara/logos](https://github.com/gilbarbara/logos)
+      - [edent/SuperTinyIcons](https://github.com/edent/SuperTinyIcons)
+    </Tip>
+  </Step>
+
+  <Step title="Test the app definition">
+    Go to the **My Apps** page in Automatisch and click **Add connection**. You should see **The cat API** listed with its icon.
+  </Step>
+</Steps>
+
+## App definition fields
+
+Every app is defined by passing a configuration object to `defineApp()`. Here is what each field does.
+
+<ParamField path="name" type="string" required>
+  The display name of the app shown in the Automatisch UI.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  A unique identifier for the app used internally by Automatisch. Use lowercase with no spaces.
+</ParamField>
+
+<ParamField path="iconUrl" type="string" required>
+  The URL of the app's SVG icon. Use the `{BASE_URL}` placeholder to reference the base URL of the Automatisch instance. Place your icon at `assets/favicon.svg` inside the app folder.
+
+  ```
+  '{BASE_URL}/apps/thecatapi/assets/favicon.svg'
+  ```
+</ParamField>
+
+<ParamField path="authDocUrl" type="string" required>
+  The URL of the documentation page that explains how to connect to the app. Shown on the connection page in the Automatisch UI. Use `{DOCS_URL}` as a placeholder.
+
+  ```
+  '{DOCS_URL}/apps/thecatapi/connection'
+  ```
+</ParamField>
+
+<ParamField path="supportsConnections" type="boolean" required>
+  Set to `true` if the app requires authentication (a connection). Set to `false` for apps like RSS or Scheduler that work without credentials.
+</ParamField>
+
+<ParamField path="baseUrl" type="string" required>
+  The base URL of the third-party service's website. For example, `'https://thecatapi.com'`.
+</ParamField>
+
+<ParamField path="apiBaseUrl" type="string" required>
+  The base URL for the third-party service's API. HTTP requests made with `$.http` are relative to this URL.
+</ParamField>
+
+<ParamField path="primaryColor" type="string" required>
+  A hex color code that reflects the branding of the third-party service. Used to generate a fallback icon if none is provided.
+</ParamField>
+
+<ParamField path="auth" type="object">
+  The authentication configuration for the app. See [Auth](/build-integrations/auth) for details.
+</ParamField>
+
+<ParamField path="triggers" type="array">
+  An array of trigger definitions for the app. See [Triggers](/build-integrations/triggers) for details.
+</ParamField>
+
+<ParamField path="actions" type="array">
+  An array of action definitions for the app. See [Actions](/build-integrations/actions) for details.
+</ParamField>
+
+<ParamField path="beforeRequest" type="array">
+  An array of hook functions that run before every HTTP request. Commonly used to inject auth headers.
+</ParamField>
+
+## Full app definition example
+
+Here is a complete `index.js` that wires together auth, triggers, and actions — modeled after the GitHub integration.
+
+```javascript
+import defineApp from '../../helpers/define-app.js';
+import addAuthHeader from './common/add-auth-header.js';
+import auth from './auth/index.js';
+import triggers from './triggers/index.js';
+import actions from './actions/index.js';
+import dynamicData from './dynamic-data/index.js';
+
+export default defineApp({
+  name: 'GitHub',
+  key: 'github',
+  baseUrl: 'https://github.com',
+  apiBaseUrl: 'https://api.github.com',
+  iconUrl: '{BASE_URL}/apps/github/assets/favicon.svg',
+  authDocUrl: '{DOCS_URL}/apps/github/connection',
+  primaryColor: '#000000',
+  supportsConnections: true,
+  beforeRequest: [addAuthHeader],
+  auth,
+  triggers,
+  actions,
+  dynamicData,
+});
+```

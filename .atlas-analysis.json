@@ -1,0 +1,98 @@
+{
+  "projectType": "saas",
+  "projectName": "Automatisch",
+  "projectDescription": "An open source, self-hosted workflow automation platform that lets you connect apps like Slack, GitHub, and Gmail to automate business processes without coding.",
+  "theme": "almond",
+  "primaryColor": "#041c53",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "guide/installation",
+              "guide/key-concepts",
+              "guide/create-flow"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "advanced/configuration",
+              "advanced/credentials",
+              "advanced/telemetry"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "guide/available-apps",
+              "guide/request-integration"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "contributing/development-setup",
+              "contributing/repository-structure",
+              "contributing/contribution-guide"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Build Integrations",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "build-integrations/overview",
+              "build-integrations/folder-structure",
+              "build-integrations/global-variable"
+            ]
+          },
+          {
+            "group": "Integration Guide",
+            "pages": [
+              "build-integrations/app",
+              "build-integrations/auth",
+              "build-integrations/triggers",
+              "build-integrations/actions",
+              "build-integrations/examples"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Visual workflow builder with no-code triggers and actions",
+    "Self-hosted deployment for full data sovereignty and GDPR compliance",
+    "90+ built-in app integrations (Slack, GitHub, Gmail, OpenAI, etc.)",
+    "Polling and webhook-based triggers",
+    "Enterprise Edition with SAML SSO, role-based access control, and templates",
+    "MCP (Model Context Protocol) server support for AI agents",
+    "Open source under AGPL-3.0 with an Enterprise Edition available",
+    "Docker and Docker Compose deployment support"
+  ],
+  "publicApiSurface": [
+    "defineApp(config) — defines a new app integration",
+    "defineTrigger(config) — defines a polling or webhook trigger",
+    "defineAction(config) — defines an action step",
+    "$.http — HTTP client for making API requests inside triggers/actions",
+    "$.pushTriggerItem({ raw, meta: { internalId } }) — emits trigger data",
+    "$.setActionItem({ raw }) — sets action output data",
+    "$.auth.data — access connection credentials",
+    "$.step.parameters — access user-provided step inputs",
+    "GET /api/v1/flows — list flows",
+    "POST /api/v1/flows — create flow",
+    "GET /api/v1/executions — list executions",
+    "GET /api/v1/apps — list available apps",
+    "POST /webhooks/:flowId — incoming webhook trigger endpoint"
+  ]
+}

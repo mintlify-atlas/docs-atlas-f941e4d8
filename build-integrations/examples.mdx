@@ -1,0 +1,561 @@
+---
+title: "Examples"
+description: "Reference implementations for authentication, triggers, and actions across real Automatisch integrations."
+---
+
+<Info>
+  The build integrations section is best understood when read from beginning to end. Start from the first page and work through each one in order.
+
+  1. [Folder structure](/build-integrations/folder-structure)
+  2. [App](/build-integrations/app)
+  3. [Global variable](/build-integrations/global-variable)
+  4. [Auth](/build-integrations/auth)
+  5. [Triggers](/build-integrations/triggers)
+  6. [Actions](/build-integrations/actions)
+  7. **Examples** (you are here)
+</Info>
+
+This page collects full working examples from the Automatisch codebase. Use them as a reference when building your own integration.
+
+## Authentication
+
+### API key auth
+
+API key auth collects credentials directly from the user and validates them against the API. The cat API integration built throughout this guide is the canonical example.
+
+<CodeGroup>
+
+```javascript auth/index.js
+import verifyCredentials from './verify-credentials.js';
+import isStillVerified from './is-still-verified.js';
+
+export default {
+  fields: [
+    {
+      key: 'screenName',
+      label: 'Screen Name',
+      type: 'string',
+      required: true,
+      readOnly: false,
+      value: null,
+      placeholder: null,
+      description:
+        'Screen name of your connection to be used on Automatisch UI.',
+      clickToCopy: false,
+    },
+    {
+      key: 'apiKey',
+      label: 'API Key',
+      type: 'string',
+      required: true,
+      readOnly: false,
+      value: null,
+      placeholder: null,
+      description: 'API key of the cat API service.',
+      clickToCopy: false,
+    },
+  ],
+
+  verifyCredentials,
+  isStillVerified,
+};
+```
+
+```javascript auth/verify-credentials.js
+const verifyCredentials = async ($) => {
+  await $.http.get('/v1/images/search');
+
+  await $.auth.set({
+    screenName: $.auth.data.screenName,
+  });
+};
+
+export default verifyCredentials;
+```
+
+```javascript auth/is-still-verified.js
+import verifyCredentials from './verify-credentials.js';
+
+const isStillVerified = async ($) => {
+  await verifyCredentials($);
+  return true;
+};
+
+export default isStillVerified;
+```
+
+</CodeGroup>
+
+Other apps that use API key auth: [DeepL](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/deepl/auth/index.js), [Twilio](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/twilio/auth/index.js), [SignalWire](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/signalwire/auth/index.js), [SMTP](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/smtp/auth/index.js).
+
+### 3-legged OAuth
+
+3-legged OAuth redirects the user to the third-party service to grant access. The app exchanges the resulting authorization code for an access token. The GitHub integration is a complete example.
+
+<CodeGroup>
+
+```javascript auth/index.js
+import generateAuthUrl from './generate-auth-url.js';
+import verifyCredentials from './verify-credentials.js';
+import isStillVerified from './is-still-verified.js';
+
+export default {
+  fields: [
+    {
+      key: 'oAuthRedirectUrl',
+      label: 'OAuth Redirect URL',
+      type: 'string',
+      required: true,
+      readOnly: true,
+      value: '{WEB_APP_URL}/app/github/connections/add',
+      placeholder: null,
+      description:
+        'When asked to input an OAuth callback or redirect URL in Github OAuth, enter the URL above.',
+      docUrl: 'https://automatisch.io/docs/github#oauth-redirect-url',
+      clickToCopy: true,
+    },
+    {
+      key: 'consumerKey',
+      label: 'Client ID',
+      type: 'string',
+      required: true,
+      readOnly: false,
+      value: null,
+      placeholder: null,
+      description: null,
+      docUrl: 'https://automatisch.io/docs/github#client-id',
+      clickToCopy: false,
+    },
+    {
+      key: 'consumerSecret',
+      label: 'Client Secret',
+      type: 'string',
+      required: true,
+      readOnly: false,
+      value: null,
+      placeholder: null,
+      description: null,
+      docUrl: 'https://automatisch.io/docs/github#client-secret',
+      clickToCopy: false,
+    },
+  ],
+
+  generateAuthUrl,
+  verifyCredentials,
+  isStillVerified,
+};
+```
+
+```javascript auth/generate-auth-url.js
+import { URLSearchParams } from 'url';
+
+export default async function generateAuthUrl($) {
+  const scopes = ['read:org', 'repo', 'user'];
+  const oauthRedirectUrlField = $.app.auth.fields.find(
+    (field) => field.key == 'oAuthRedirectUrl'
+  );
+  const redirectUri = oauthRedirectUrlField.value;
+  const searchParams = new URLSearchParams({
+    client_id: $.auth.data.consumerKey,
+    redirect_uri: redirectUri,
+    scope: scopes.join(','),
+  });
+
+  const url = `${
+    $.app.baseUrl
+  }/login/oauth/authorize?${searchParams.toString()}`;
+
+  await $.auth.set({
+    url,
+  });
+}
+```
+
+```javascript auth/verify-credentials.js
+import getCurrentUser from '../common/get-current-user.js';
+
+const verifyCredentials = async ($) => {
+  const response = await $.http.post(
+    `${$.app.baseUrl}/login/oauth/access_token`,
+    {
+      client_id: $.auth.data.consumerKey,
+      client_secret: $.auth.data.consumerSecret,
+      code: $.auth.data.code,
+    },
+    {
+      headers: {
+        Accept: 'application/json',
+      },
+    }
+  );
+
+  const data = response.data;
+
+  $.auth.data.accessToken = data.access_token;
+
+  const currentUser = await getCurrentUser($);
+
+  await $.auth.set({
+    consumerKey: $.auth.data.consumerKey,
+    consumerSecret: $.auth.data.consumerSecret,
+    accessToken: data.access_token,
+    scope: data.scope,
+    tokenType: data.token_type,
+    userId: currentUser.id,
+    screenName: currentUser.login,
+  });
+};
+
+export default verifyCredentials;
+```
+
+```javascript auth/is-still-verified.js
+import getCurrentUser from '../common/get-current-user.js';
+
+const isStillVerified = async ($) => {
+  const user = await getCurrentUser($);
+  return !!user.id;
+};
+
+export default isStillVerified;
+```
+
+</CodeGroup>
+
+Other apps that use 3-legged OAuth: [Discord](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/discord/auth/index.js), [Flickr](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/flickr/auth/index.js), [Salesforce](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/salesforce/auth/index.js), [Slack](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/slack/auth/index.js), [Twitter](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/twitter/auth/index.js).
+
+### OAuth with refresh token
+
+Some OAuth providers issue short-lived access tokens alongside a refresh token. Automatisch supports this pattern — see [Salesforce](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/salesforce/auth/index.js) for a complete example.
+
+### Without authentication
+
+Some apps do not require credentials at all. Set `supportsConnections: false` in the app definition and omit the `auth` field.
+
+- [RSS](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/rss/index.js)
+- [Scheduler](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/scheduler/index.js)
+
+---
+
+## Triggers
+
+### Polling trigger with pagination
+
+The GitHub `New issues` trigger fetches paginated results in descending order and stops when there are no more pages.
+
+<CodeGroup>
+
+```javascript triggers/new-issues/index.js
+import defineTrigger from '../../../../helpers/define-trigger.js';
+import newIssues from './new-issues.js';
+
+export default defineTrigger({
+  name: 'New issues',
+  key: 'newIssues',
+  pollInterval: 15,
+  description: 'Triggers when a new issue is created',
+  arguments: [
+    {
+      label: 'Repo',
+      key: 'repo',
+      type: 'dropdown',
+      required: false,
+      variables: false,
+      source: {
+        type: 'query',
+        name: 'getDynamicData',
+        arguments: [
+          {
+            name: 'key',
+            value: 'listRepos',
+          },
+        ],
+      },
+    },
+    {
+      label: 'Which types of issues should this trigger on?',
+      key: 'issueType',
+      type: 'dropdown',
+      description: 'Defaults to any issue you can see.',
+      required: true,
+      variables: false,
+      value: 'all',
+      options: [
+        { label: 'Any issue you can see', value: 'all' },
+        { label: 'Only issues assigned to you', value: 'assigned' },
+        { label: 'Only issues created by you', value: 'created' },
+        { label: `Only issues you're mentioned in`, value: 'mentioned' },
+        { label: `Only issues you're subscribed to`, value: 'subscribed' },
+      ],
+    },
+    {
+      label: 'Label',
+      key: 'label',
+      type: 'dropdown',
+      description: 'Only trigger on issues when this label is added.',
+      required: false,
+      variables: false,
+      dependsOn: ['parameters.repo'],
+      source: {
+        type: 'query',
+        name: 'getDynamicData',
+        arguments: [
+          {
+            name: 'key',
+            value: 'listLabels',
+          },
+          {
+            name: 'parameters.repo',
+            value: '{parameters.repo}',
+          },
+        ],
+      },
+    },
+  ],
+
+  async run($) {
+    await newIssues($);
+  },
+});
+```
+
+```javascript triggers/new-issues/new-issues.js
+import getRepoOwnerAndRepo from '../../common/get-repo-owner-and-repo.js';
+import parseLinkHeader from '../../../../helpers/parse-header-link.js';
+
+function getPathname($) {
+  const { repoOwner, repo } = getRepoOwnerAndRepo($.step.parameters.repo);
+
+  if (repoOwner && repo) {
+    return `/repos/${repoOwner}/${repo}/issues`;
+  }
+
+  return '/issues';
+}
+
+const newIssues = async ($) => {
+  const pathname = getPathname($);
+  const params = {
+    labels: $.step.parameters.label,
+    filter: 'all',
+    state: 'all',
+    sort: 'created',
+    direction: 'desc',
+    per_page: 100,
+  };
+
+  let links;
+  do {
+    const response = await $.http.get(pathname, { params });
+    links = parseLinkHeader(response.headers.link);
+
+    if (response.data.length) {
+      for (const issue of response.data) {
+        const issueId = issue.id;
+
+        $.pushTriggerItem({
+          raw: issue,
+          meta: {
+            internalId: issueId.toString(),
+          },
+        });
+      }
+    }
+  } while (links.next);
+};
+
+export default newIssues;
+```
+
+</CodeGroup>
+
+Other polling trigger examples: [Search tweets - Twitter](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/twitter/triggers/search-tweets/index.js), [New stargazers - Github](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/github/triggers/new-stargazers/index.js), [New watchers - Github](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/github/triggers/new-watchers/index.js).
+
+### Webhook-based trigger
+
+Webhook triggers receive data pushed by the third-party service rather than polling for it. They require `type: 'webhook'` and must implement `registerHook` and `unregisterHook` to manage the webhook subscription.
+
+<Warning>
+  Webhook triggers require a publicly accessible URL. During development, use [ngrok](https://ngrok.com) and set the `WEBHOOK_URL` environment variable to override the webhook URL.
+</Warning>
+
+The Typeform `New entry` trigger is a complete webhook example that also implements `testRun` so users can test it without submitting a real form.
+
+```javascript triggers/new-entry/index.js
+import Crypto from 'crypto';
+import appConfig from '../../../../config/app.js';
+import defineTrigger from '../../../../helpers/define-trigger.js';
+
+export default defineTrigger({
+  name: 'New entry',
+  key: 'newEntry',
+  type: 'webhook',
+  description: 'Triggers when a new form is submitted.',
+  arguments: [
+    {
+      label: 'Form',
+      key: 'formId',
+      type: 'dropdown',
+      required: true,
+      description: 'Pick a form to receive submissions.',
+      variables: false,
+      source: {
+        type: 'query',
+        name: 'getDynamicData',
+        arguments: [
+          {
+            name: 'key',
+            value: 'listForms',
+          },
+        ],
+      },
+    },
+  ],
+
+  async run($) {
+    const dataItem = {
+      raw: $.request.body,
+      meta: {
+        internalId: Crypto.randomUUID(),
+      },
+    };
+
+    $.pushTriggerItem(dataItem);
+  },
+
+  async testRun($) {
+    const { data: form } = await $.http.get(
+      `/forms/${$.step.parameters.formId}`
+    );
+
+    const { data: responses } = await $.http.get(
+      `/forms/${$.step.parameters.formId}/responses`
+    );
+
+    const lastResponse = responses.items[0];
+
+    if (!lastResponse) {
+      return;
+    }
+
+    const computedWebhookEvent = {
+      event_type: 'form_response',
+      form_response: {
+        form_id: form.id,
+        token: lastResponse.token,
+        landed_at: lastResponse.landed_at,
+        submitted_at: lastResponse.submitted_at,
+        definition: {
+          id: $.step.parameters.formId,
+          title: form.title,
+          fields: form?.fields,
+        },
+        answers: lastResponse.answers,
+      },
+    };
+
+    $.pushTriggerItem({
+      raw: computedWebhookEvent,
+      meta: {
+        internalId: computedWebhookEvent.form_response.token,
+      },
+    });
+  },
+
+  async registerHook($) {
+    const subscriptionPayload = {
+      enabled: true,
+      url: $.webhookUrl,
+      secret: appConfig.webhookSecretKey,
+    };
+
+    await $.http.put(
+      `/forms/${$.step.parameters.formId}/webhooks/${$.flow.id}`,
+      subscriptionPayload
+    );
+  },
+
+  async unregisterHook($) {
+    await $.http.delete(
+      `/forms/${$.step.parameters.formId}/webhooks/${$.flow.id}`
+    );
+  },
+});
+```
+
+---
+
+## Actions
+
+### Create a record
+
+The GitHub `Create issue` action shows how to validate arguments, build an API request from step parameters, and store the result.
+
+```javascript actions/create-issue/index.js
+import defineAction from '../../../../helpers/define-action.js';
+import getRepoOwnerAndRepo from '../../common/get-repo-owner-and-repo.js';
+
+export default defineAction({
+  name: 'Create issue',
+  key: 'createIssue',
+  description: 'Creates a new issue.',
+  arguments: [
+    {
+      label: 'Repo',
+      key: 'repo',
+      type: 'dropdown',
+      required: true,
+      variables: true,
+      source: {
+        type: 'query',
+        name: 'getDynamicData',
+        arguments: [
+          {
+            name: 'key',
+            value: 'listRepos',
+          },
+        ],
+      },
+    },
+    {
+      label: 'Title',
+      key: 'title',
+      type: 'string',
+      required: true,
+      variables: true,
+    },
+    {
+      label: 'Body',
+      key: 'body',
+      type: 'string',
+      required: true,
+      variables: true,
+    },
+  ],
+
+  async run($) {
+    const repoParameter = $.step.parameters.repo;
+    const title = $.step.parameters.title;
+    const body = $.step.parameters.body;
+
+    if (!repoParameter) throw new Error('A repo must be set!');
+    if (!title) throw new Error('A title must be set!');
+
+    const { repoOwner, repo } = getRepoOwnerAndRepo(repoParameter);
+    const response = await $.http.post(`/repos/${repoOwner}/${repo}/issues`, {
+      title,
+      body,
+    });
+
+    $.setActionItem({ raw: response.data });
+  },
+});
+```
+
+Other action examples:
+- [Send a message to channel - Slack](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/slack/actions/send-a-message-to-channel/index.js)
+- [Send SMS - Twilio](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/twilio/actions/send-sms/index.js)
+- [Send a message to channel - Discord](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/discord/actions/send-message-to-channel/index.js)
+- [Send an email - SMTP](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/smtp/actions/send-email/index.js)
+- [Create tweet - Twitter](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/twitter/actions/create-tweet/index.js)
+- [Translate text - DeepL](https://github.com/automatisch/automatisch/tree/main/packages/backend/src/apps/deepl/actions/translate-text/index.js)

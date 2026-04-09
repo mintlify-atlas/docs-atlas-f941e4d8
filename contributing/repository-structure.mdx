@@ -1,0 +1,91 @@
+---
+title: "Repository structure"
+description: "An overview of the Automatisch monorepo layout and the purpose of each package."
+---
+
+Automatisch is organized as a monorepo. All packages live under the `packages/` directory, each with its own `package.json` and independently managed dependencies.
+
+## Directory layout
+
+```
+automatisch/
+├── packages/
+│   ├── backend/       # Node.js API server, worker, and app integrations
+│   ├── web/           # React frontend
+│   ├── docs/          # Documentation site
+│   └── e2e-tests/     # End-to-end test suite
+├── LICENSE
+├── LICENSE.agpl
+├── LICENSE.enterprise
+└── README.md
+```
+
+## Packages
+
+### `packages/backend`
+
+The backend is a **Node.js/Express** application. It exposes the REST API consumed by the frontend, runs background jobs via BullMQ workers, and contains all service integrations (triggers and actions).
+
+Key subdirectories inside `packages/backend/src/`:
+
+```
+src/
+├── apps/         # One directory per integration (e.g. github/, slack/, stripe/)
+├── config/       # App-wide configuration (database, environment variables)
+├── controllers/  # Express route controllers
+├── db/           # Knex migrations and seeds
+├── models/       # Objection.js ORM models
+├── queues/       # BullMQ queue definitions
+├── routes/       # Express router setup
+├── workers/      # Background job processors
+└── server.js     # Application entry point
+```
+
+Each integration under `apps/` follows the same layout:
+
+```
+apps/github/
+├── actions/      # Action definitions
+├── triggers/     # Trigger definitions
+├── auth/         # OAuth / API key auth configuration
+├── assets/       # Integration logo and metadata
+└── index.js      # Integration entry point
+```
+
+There are over 90 integrations included in the repository.
+
+### `packages/web`
+
+The frontend is a **React** application bundled with **Vite**. It uses Material UI for components and React Query for server state management.
+
+Notable libraries used:
+
+- `@mui/material` and `@mui/joy` — UI components
+- `@tanstack/react-query` — data fetching and caching
+- `react-router-dom` — client-side routing
+- `@xyflow/react` — flow canvas for the workflow editor
+
+### `packages/docs`
+
+The documentation site, built with **VitePress**. The source Markdown and MDX files live here. Run `yarn dev` in this directory to preview documentation locally at `http://localhost:3002`.
+
+### `packages/e2e-tests`
+
+End-to-end tests for internal use. These tests exercise the full application stack and are not required to run for most contributions.
+
+## Enterprise Edition files
+
+Automatisch ships as two editions in the same repository:
+
+- **Community Edition (CE)** — licensed under AGPL-3.0
+- **Enterprise Edition (EE)** — licensed under the Automatisch Enterprise license
+
+Files that belong to the Enterprise Edition contain `.ee.` in their filename — for example, `saml-auth.ee.js` or `billing.ee.ts`. All other files are covered by the AGPL-3.0 license.
+
+<Note>
+  When adding a new feature that should be exclusive to the Enterprise Edition,
+  include `.ee.` in the filename. Community Edition contributions should not
+  use this naming convention.
+</Note>
+
+See the [`LICENSE`](https://github.com/automatisch/automatisch/blob/main/LICENSE) file for the full details on which license applies to which files.

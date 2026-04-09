@@ -1,0 +1,134 @@
+---
+title: "Folder structure"
+description: "How an Automatisch integration's files are organized and what each directory and file is responsible for."
+---
+
+<Info>
+  This section is best read from beginning to end. If you haven't already, start with the [Build integrations overview](/build-integrations/overview).
+</Info>
+
+All integrations live under `packages/backend/src/apps/`. Each app has its own directory named in **kebab-case** (for example, `github`, `slack`, `the-cat-api`).
+
+## Directory layout
+
+```
+packages/backend/src/apps/github/
+├── actions/
+│   ├── create-issue/
+│   │   ├── index.js
+│   │   └── create-issue.js
+│   └── index.js
+├── assets/
+│   └── favicon.svg
+├── auth/
+│   └── index.js
+├── common/
+│   └── add-auth-header.js
+├── dynamic-data/
+│   └── index.js
+├── triggers/
+│   ├── new-issues/
+│   │   ├── index.js
+│   │   └── new-issues.js
+│   └── index.js
+└── index.js
+```
+
+The GitHub app is a real integration included in the Automatisch repository. The same structure applies to every other app — for example, `packages/backend/src/apps/slack/` follows the same pattern.
+
+## Files and directories
+
+### `index.js` — app definition
+
+The entry point for the entire integration. It calls `defineApp` and exports an object that describes the app and wires together all of its parts:
+
+```javascript
+import defineApp from '../../helpers/define-app.js';
+import addAuthHeader from './common/add-auth-header.js';
+import auth from './auth/index.js';
+import triggers from './triggers/index.js';
+import actions from './actions/index.js';
+import dynamicData from './dynamic-data/index.js';
+
+export default defineApp({
+  name: 'GitHub',
+  key: 'github',
+  baseUrl: 'https://github.com',
+  apiBaseUrl: 'https://api.github.com',
+  iconUrl: '{BASE_URL}/apps/github/assets/favicon.svg',
+  authDocUrl: '{DOCS_URL}/apps/github/connection',
+  primaryColor: '#000000',
+  supportsConnections: true,
+  beforeRequest: [addAuthHeader],
+  auth,
+  triggers,
+  actions,
+  dynamicData,
+});
+```
+
+Whatever you build inside the app must be registered here. Triggers, actions, dynamic data sources, and auth configuration are all imported and attached on this object.
+
+### `auth/`
+
+Contains the authentication configuration for the app. Automatisch stores encrypted credentials (connections) in its database after auth completes. The auth folder is responsible for collecting those credentials — whether via OAuth 2.0, an API key form, or another method.
+
+### `triggers/`
+
+Each trigger lives in its own subdirectory named in kebab-case. The subdirectory typically contains two files:
+
+- **`index.js`** — calls `defineTrigger` with the trigger's metadata, argument definitions, and a `run` function
+- **`<trigger-name>.js`** — the implementation that calls `$.http` and `$.pushTriggerItem`
+
+The `triggers/index.js` at the top of the `triggers/` folder collects all trigger exports and re-exports them as an array.
+
+```javascript
+// triggers/new-issues/index.js
+import defineTrigger from '../../../../helpers/define-trigger.js';
+import newIssues from './new-issues.js';
+
+export default defineTrigger({
+  name: 'New issues',
+  key: 'newIssues',
+  pollInterval: 15,
+  description: 'Triggers when a new issue is created',
+  arguments: [
+    // field definitions shown to users in the UI
+  ],
+  async run($) {
+    await newIssues($);
+  },
+});
+```
+
+### `actions/`
+
+Follows the same pattern as `triggers/`. Each action has its own subdirectory with an `index.js` (calls `defineAction`) and a file for the implementation (calls `$.http` and `$.setActionItem`).
+
+### `common/`
+
+Shared utilities used by triggers, actions, or auth — for example, a function that attaches an `Authorization` header to every outgoing request. Nothing here is loaded by Automatisch directly; you import it wherever you need it.
+
+### `dynamic-data/`
+
+Functions that load data from the third-party service to populate dropdown fields in the Automatisch UI. For example, the GitHub integration uses dynamic data to fetch a list of repositories so users can select one when configuring the "New issues" trigger.
+
+This data is not part of a trigger or action run itself — it only supports the configuration experience in the UI.
+
+### `assets/favicon.svg`
+
+The app's icon, displayed in the Automatisch UI. Only `favicon.svg` is currently served from this directory.
+
+## Naming conventions
+
+| Thing | Convention | Example |
+|---|---|---|
+| App directory | kebab-case | `the-cat-api` |
+| Trigger/action directories | kebab-case | `new-issues`, `send-a-message-to-channel` |
+| App `key` field | camelCase | `theCatApi` |
+| Trigger/action `key` field | camelCase | `newIssues`, `sendMessageToChannel` |
+| Argument `key` fields | camelCase | `repoOwner`, `message` |
+
+<Tip>
+  Keep trigger and action directory names descriptive and user-facing — they map closely to how the trigger or action is named in the UI.
+</Tip>

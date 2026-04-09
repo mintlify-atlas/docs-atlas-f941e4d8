@@ -1,0 +1,41 @@
+---
+title: "Key concepts"
+description: "Understand the four core building blocks of Automatisch: apps, connections, flows, and steps."
+---
+
+Before building your first automation, it helps to understand the four core concepts that everything in Automatisch is built around.
+
+<CardGroup cols={2}>
+  <Card title="App" icon="grid-2">
+    An **app** is a third-party service you can use with Automatisch, such as Slack, GitHub, Gmail, or Typeform. Automatisch supports 90+ apps. Every flow you build will involve at least one app, and every connection is tied to a specific app.
+
+    You can browse all available apps in the [integrations list](/guide/available-apps), or [request a new integration](/guide/request-integration) if the service you need is not yet supported.
+  </Card>
+  <Card title="Connection" icon="plug">
+    A **connection** holds the credentials that allow Automatisch to access an app on your behalf — things like API keys, OAuth tokens, or client secrets. You create a connection by going to **My Apps**, selecting an app, and entering the required credentials.
+
+    You can have multiple connections for the same app if you have more than one account with that service.
+  </Card>
+  <Card title="Flow" icon="bolt">
+    A **flow** is an automated workflow made up of one or more steps. Flows define what Automatisch does and when. For example, a flow might watch for new Typeform submissions and post them to a Slack channel.
+
+    Flows must be published before they run. A published flow executes automatically whenever its trigger fires, or on a polling interval of every 15 minutes for poll-based triggers.
+  </Card>
+  <Card title="Step" icon="list-ol">
+    A **step** is a single unit of work inside a flow. Every flow has at least two steps: a trigger and one or more actions.
+
+    - **Trigger** — the first step in every flow. It defines the event that starts the flow, such as "new form submission" or "new repository star."
+    - **Action** — all steps after the trigger. Actions define what happens in response to the trigger, such as "send a message to a Slack channel." A flow can have multiple action steps.
+  </Card>
+</CardGroup>
+
+## How they fit together
+
+A typical flow works like this:
+
+1. You create a **connection** to each **app** you want to use.
+2. You create a **flow** and add a **trigger step** — choosing an app, event type, and connection.
+3. You add one or more **action steps**, each connected to an app and event.
+4. You publish the flow. Automatisch monitors for trigger events and runs the action steps automatically.
+
+Ready to build your first flow? See [Create a flow](/guide/create-flow) for a step-by-step walkthrough.

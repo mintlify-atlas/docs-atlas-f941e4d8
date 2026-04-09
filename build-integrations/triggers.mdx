@@ -1,0 +1,239 @@
+---
+title: "Triggers"
+description: "Define polling and webhook-based triggers that start a workflow when new data arrives."
+---
+
+<Info>
+  The build integrations section is best understood when read from beginning to end. Start from the first page and work through each one in order.
+
+  1. [Folder structure](/build-integrations/folder-structure)
+  2. [App](/build-integrations/app)
+  3. [Global variable](/build-integrations/global-variable)
+  4. [Auth](/build-integrations/auth)
+  5. **Triggers** (you are here)
+  6. [Actions](/build-integrations/actions)
+  7. [Examples](/build-integrations/examples)
+</Info>
+
+A trigger watches for new data from a third-party service and starts a workflow when it finds some. Automatisch supports two kinds of triggers: polling (periodic HTTP requests) and webhook (the third-party service pushes data).
+
+<Warning>
+  This page covers polling triggers. For webhook-based triggers, see the [Examples](/build-integrations/examples) page.
+</Warning>
+
+## Add triggers to the app
+
+Open your app's `index.js` and import the triggers module.
+
+```javascript
+import defineApp from '../../helpers/define-app.js';
+import auth from './auth/index.js';
+import triggers from './triggers/index.js';
+
+export default defineApp({
+  name: 'The cat API',
+  key: 'thecatapi',
+  iconUrl: '{BASE_URL}/apps/thecatapi/assets/favicon.svg',
+  authDocUrl: '{DOCS_URL}/apps/thecatapi/connection',
+  supportsConnections: true,
+  baseUrl: 'https://thecatapi.com',
+  apiBaseUrl: 'https://api.thecatapi.com',
+  primaryColor: '#000000',
+  auth,
+  triggers,
+});
+```
+
+## Create a trigger
+
+<Steps>
+  <Step title="Create the triggers index">
+    Create `triggers/index.js` and export your triggers as an array.
+
+    ```javascript
+    import searchCatImages from './search-cat-images/index.js';
+
+    export default [searchCatImages];
+    ```
+
+    <Tip>
+      The order of triggers in this array determines the order they appear in the Automatisch UI. Add each new trigger to this array.
+    </Tip>
+  </Step>
+
+  <Step title="Add the trigger metadata">
+    Create `triggers/search-cat-images/index.js` with the trigger definition.
+
+    ```javascript
+    import defineTrigger from '../../../../helpers/define-trigger.js';
+
+    export default defineTrigger({
+      name: 'Search cat images',
+      key: 'searchCatImages',
+      pollInterval: 15,
+      description: 'Triggers when there is a new cat image.',
+
+      async run($) {
+        // TODO: Implement trigger!
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Implement the run function">
+    Add the logic that fetches data and pushes items to Automatisch.
+
+    <Warning>
+      Automatisch requires data to be pushed in **reverse-chronological order** (newest first). If items are not ordered this way, the trigger will not work correctly.
+
+      Every item must include a unique identifier as `internalId`. This is used to deduplicate data across trigger runs.
+    </Warning>
+
+    ```javascript
+    import defineTrigger from '../../../../helpers/define-trigger.js';
+
+    export default defineTrigger({
+      name: 'Search cat images',
+      key: 'searchCatImages',
+      pollInterval: 15,
+      description: 'Triggers when there is a new cat image.',
+
+      async run($) {
+        let page = 0;
+        let response;
+
+        const headers = {
+          'x-api-key': $.auth.data.apiKey,
+        };
+
+        do {
+          let requestPath = `/v1/images/search?page=${page}&limit=10&order=DESC`;
+          response = await $.http.get(requestPath, { headers });
+
+          response.data.forEach((image) => {
+            const dataItem = {
+              raw: image,
+              meta: {
+                internalId: image.id
+              },
+            };
+
+            $.pushTriggerItem(dataItem);
+          });
+
+          page += 1;
+        } while (response.data.length >= 10);
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Test the trigger">
+    Go to the flows page in Automatisch and create a new flow. Choose **The cat API** app and the **Search cat images** trigger, then click **Test & Continue**. A JSON response in the UI confirms the trigger is working.
+  </Step>
+</Steps>
+
+## How `$.pushTriggerItem` works
+
+`$.pushTriggerItem` accepts an object with two fields:
+
+- `raw` — the data item to push to Automatisch. This is what subsequent steps in the workflow receive.
+- `meta.internalId` — a unique identifier for the item. Used to deduplicate across runs.
+
+```javascript
+$.pushTriggerItem({
+  raw: image,
+  meta: {
+    internalId: image.id,
+  },
+});
+```
+
+<Tip>
+  `$.pushTriggerItem` is smart about deduplication. If an item with the same `internalId` has already been processed by a flow, it stops fetching more data. The deduplication check is scoped to the individual flow, not globally.
+</Tip>
+
+<Tip>
+  When a user clicks **Test & Continue**, `$.pushTriggerItem` pushes only one item regardless of whether that item was already processed. This lets users see real data without triggering duplicate workflow runs.
+</Tip>
+
+<Tip>
+  If a trigger encounters a rate limit error mid-run, Automatisch will not lose the data fetched so far. It stops at the error but processes all items already pushed before the failure.
+</Tip>
+
+## Trigger config fields reference
+
+<ParamField path="name" type="string" required>
+  The display name of the trigger shown in the Automatisch UI.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  A unique camelCase identifier for the trigger used internally by Automatisch.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  A short description of what the trigger does. Shown in the UI below the trigger name.
+</ParamField>
+
+<ParamField path="pollInterval" type="number">
+  The interval in minutes at which the trigger should be polled. Required for polling triggers. Currently the system default is 15 minutes regardless of this value.
+</ParamField>
+
+<ParamField path="type" type="string">
+  Set to `'webhook'` for webhook-based triggers. Omit this field for polling triggers.
+</ParamField>
+
+<ParamField path="run" type="function" required>
+  The function called when the trigger runs. Use `$.pushTriggerItem()` inside this function to push data to Automatisch. Does not need to return a value.
+</ParamField>
+
+<ParamField path="testRun" type="function">
+  An optional function used when the user clicks **Test & Continue** in the UI. Required for webhook triggers where the `run` function only handles incoming webhook payloads and cannot fetch historical data on its own.
+</ParamField>
+
+<ParamField path="registerHook" type="function">
+  For webhook triggers. Called when a flow is published. Use this to register the webhook URL (`$.webhookUrl`) with the third-party service.
+</ParamField>
+
+<ParamField path="unregisterHook" type="function">
+  For webhook triggers. Called when a flow is unpublished or deleted. Use this to remove the webhook registration from the third-party service.
+</ParamField>
+
+<ParamField path="arguments" type="array">
+  Optional array of input fields shown to the user when configuring the trigger. Supports the same field types as action arguments.
+</ParamField>
+
+## Pagination pattern
+
+When an API returns paginated results, continue fetching pages until you reach the last one. The example below uses a header-based pagination pattern from the GitHub integration.
+
+```javascript
+import parseLinkHeader from '../../../../helpers/parse-header-link.js';
+
+const newIssues = async ($) => {
+  const params = {
+    filter: 'all',
+    state: 'all',
+    sort: 'created',
+    direction: 'desc',
+    per_page: 100,
+  };
+
+  let links;
+  do {
+    const response = await $.http.get('/issues', { params });
+    links = parseLinkHeader(response.headers.link);
+
+    for (const issue of response.data) {
+      $.pushTriggerItem({
+        raw: issue,
+        meta: {
+          internalId: issue.id.toString(),
+        },
+      });
+    }
+  } while (links.next);
+};
+```
+
+Items must be pushed in reverse-chronological order (newest first) so Automatisch can correctly detect which items are new since the last run.

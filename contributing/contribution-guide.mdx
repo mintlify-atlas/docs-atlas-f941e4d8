@@ -1,0 +1,96 @@
+---
+title: "Contributing to Automatisch"
+description: "How to contribute bug fixes, new integrations, documentation improvements, and feature requests to Automatisch."
+---
+
+Automatisch is open source and community contributions are welcome. This guide covers the contribution workflow, what kinds of contributions are accepted, and what to keep in mind when opening a pull request.
+
+## Ways to contribute
+
+- **Bug fixes** — found something broken? Open an issue first to confirm it's a bug, then submit a fix.
+- **New integrations** — add support for a new service by building an app integration in `packages/backend/src/apps/`.
+- **Documentation** — improve or expand the docs in `packages/docs/`.
+- **Feature requests** — open a GitHub issue to propose a new feature before starting implementation.
+
+## Contribution workflow
+
+<Steps>
+  <Step title="Fork and clone the repository">
+    Fork [automatisch/automatisch](https://github.com/automatisch/automatisch) on GitHub, then clone your fork:
+
+    ```bash
+    git clone git@github.com:<your-username>/automatisch.git
+    cd automatisch
+    ```
+
+  </Step>
+
+  <Step title="Create a feature branch">
+    Branch off from `main`:
+
+    ```bash
+    git checkout -b feature/your-feature-description
+    ```
+
+    Use a descriptive branch name that reflects what you're working on.
+
+  </Step>
+
+  <Step title="Make your changes">
+    Write your code, update documentation if needed, and make sure the linter passes:
+
+    ```bash
+    yarn lint
+    ```
+
+    Run this from the project root folder. Fix any reported issues before opening a pull request.
+
+  </Step>
+
+  <Step title="Write conventional commit messages">
+    Automatisch uses [Conventional Commits](https://www.conventionalcommits.org) to generate changelogs. Follow the specification when writing commit messages:
+
+    ```
+    feat: add Stripe webhook trigger
+    fix: handle missing OAuth token on refresh
+    docs: clarify PostgreSQL version requirement
+    ```
+
+  </Step>
+
+  <Step title="Open a pull request">
+    Push your branch to your fork and open a pull request against `main` on the upstream repository. Describe what your PR does and reference any related issues.
+
+  </Step>
+</Steps>
+
+## Pull request guidelines
+
+- **Tests** — include tests for any code changes. The backend uses Vitest; run `yarn test` inside `packages/backend` to verify.
+- **Code style** — follow the existing code style. The linter (`yarn lint`) enforces most conventions automatically.
+- **Documentation** — if your change affects user-facing behavior, update the relevant docs page.
+- **Enterprise Edition files** — if your contribution is intended for the Enterprise Edition only, add `.ee.` to the filename (e.g., `my-feature.ee.js`). Community Edition contributions must not use this naming convention.
+- **One concern per PR** — keep pull requests focused. Unrelated changes are harder to review and slower to merge.
+
+## Reporting bugs
+
+Use [GitHub Issues](https://github.com/automatisch/automatisch/issues/new) to report bugs. Include steps to reproduce, the expected behavior, and the actual behavior. Providing your Automatisch version and environment details helps the maintainers triage faster.
+
+## Getting help
+
+- **GitHub Issues** — [github.com/automatisch/automatisch/issues](https://github.com/automatisch/automatisch/issues)
+- **Discord** — [discord.gg/dJSah9CVrC](https://discord.gg/dJSah9CVrC)
+
+## Code of conduct
+
+All contributors are expected to follow the [Contributor Covenant Code of Conduct](https://github.com/automatisch/automatisch/blob/main/CODE_OF_CONDUCT.md). Violations can be reported to ali@automatisch.io.
+
+## License and contributor agreement
+
+Automatisch Community Edition is licensed under [AGPL-3.0](https://github.com/automatisch/automatisch/blob/main/LICENSE.agpl). By submitting a pull request, you agree that your contribution will be licensed under AGPL-3.0.
+
+<Info>
+  Files containing `.ee.` in their name fall under the separate [Enterprise
+  Edition license](https://github.com/automatisch/automatisch/blob/main/LICENSE.enterprise).
+  Contributions to those files are subject to that license instead.
+</Info>

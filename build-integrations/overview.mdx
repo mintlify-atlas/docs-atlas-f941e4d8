@@ -1,0 +1,76 @@
+---
+title: "Build integrations"
+description: "Add new apps to Automatisch by building integrations with the Node.js integration SDK."
+---
+
+Automatisch integrations connect third-party services to the platform so users can include them in their flows. If an app you need is not in the [available apps](/guide/available-apps) list, you can build it yourself.
+
+This section is written for developers who want to extend Automatisch with new integrations. You should be comfortable with JavaScript and have a working [development setup](/contributing/development-setup) before you start.
+
+<Note>
+  The terms **integration** and **app** are used interchangeably throughout this section.
+</Note>
+
+## What is an integration?
+
+An integration is a Node.js module that lives in `packages/backend/src/apps/`. Each integration encapsulates everything Automatisch needs to work with a third-party service:
+
+- **Auth** — how to authenticate users and store their credentials
+- **Triggers** — how to detect new events in the service and pass data into a flow
+- **Actions** — how to perform operations in the service using data from earlier steps
+
+Each part of the integration receives the `$` global variable, which provides an authenticated HTTP client, access to stored credentials, step parameters configured by the user, and methods to emit output data. See [Global variable ($)](/build-integrations/global-variable) for full details.
+
+## Tech stack
+
+Integrations are written in Node.js using ES module syntax (`import`/`export`). No bundler or compilation step is required — files are loaded directly by the backend at runtime.
+
+The HTTP client bundled in `$` is a pre-configured [Axios](https://axios-http.com) instance. It sets `apiBaseUrl` as the base URL and applies any `beforeRequest` hooks you define on the app (for example, to attach an authorization header on every request).
+
+## Key concepts
+
+<CardGroup cols={2}>
+  <Card title="Folder structure" icon="folder-open" href="/build-integrations/folder-structure">
+    Learn how integration files are organized and what each directory and file is responsible for.
+  </Card>
+  <Card title="Global variable ($)" icon="dollar-sign" href="/build-integrations/global-variable">
+    Understand the `$` object passed to every trigger and action run function — HTTP client, auth data, step parameters, and output methods.
+  </Card>
+  <Card title="App definition" icon="file-code" href="/build-integrations/app">
+    Define your app's metadata, base URLs, auth configuration, and register its triggers and actions.
+  </Card>
+  <Card title="Auth" icon="key" href="/build-integrations/auth">
+    Implement OAuth 2.0, API key, or other authentication flows so users can connect their accounts.
+  </Card>
+  <Card title="Triggers" icon="bolt" href="/build-integrations/triggers">
+    Build polling or webhook triggers that detect new events and push them into flows.
+  </Card>
+  <Card title="Actions" icon="play" href="/build-integrations/actions">
+    Build action steps that perform operations and pass their output to subsequent steps.
+  </Card>
+</CardGroup>
+
+## Recommended reading order
+
+This section builds on itself — each page introduces concepts used by the pages that follow. Read in order for the best experience.
+
+<Steps>
+  <Step title="Folder structure">
+    Start here to understand how an integration's files are laid out before writing any code.
+  </Step>
+  <Step title="Global variable ($)">
+    Learn the `$` object that all trigger and action run functions receive. Every subsequent page uses it.
+  </Step>
+  <Step title="App definition">
+    Define the top-level app object that ties auth, triggers, and actions together.
+  </Step>
+  <Step title="Auth">
+    Implement the authentication flow so users can create connections to the service.
+  </Step>
+  <Step title="Triggers">
+    Add triggers that detect events in the service and start flow executions.
+  </Step>
+  <Step title="Actions">
+    Add actions that perform operations and produce output for downstream steps.
+  </Step>
+</Steps>

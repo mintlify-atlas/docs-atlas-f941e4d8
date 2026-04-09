@@ -1,0 +1,140 @@
+---
+title: "Installation"
+description: "Deploy Automatisch on your own infrastructure using Docker Compose, standalone Docker, or Render."
+---
+
+<Info>
+  Installation guides are available for Docker Compose, standalone Docker, and Render. If you need another deployment method, [open a GitHub issue](https://github.com/automatisch/automatisch/issues/new) to let the team know.
+</Info>
+
+<Tip>
+  Use `user@automatisch.io` as the email and `sample` as the password to log in for the first time. Change your email and password from the settings page before using Automatisch in production.
+</Tip>
+
+<Warning>
+  **Do not change `ENCRYPTION_KEY` or `WEBHOOK_SECRET_KEY` after your initial setup.** These values are used to encrypt stored credentials and verify webhook requests. Changing them will break all existing connections and flows.
+</Warning>
+
+<Tabs>
+  <Tab title="Docker Compose">
+    Docker Compose is the recommended installation method. It starts Automatisch along with PostgreSQL and Redis automatically.
+
+    <Steps>
+      <Step title="Clone the repository">
+        ```bash
+        git clone git@github.com:automatisch/automatisch.git
+        cd automatisch
+        ```
+      </Step>
+      <Step title="Set the required secret environment variables">
+        The three secret keys must be provided as environment variables before the stack starts. The `docker-compose.yml` reads them from your shell environment. Generate secure random values with `openssl`:
+
+        ```bash
+        export ENCRYPTION_KEY=$(openssl rand -base64 36)
+        export WEBHOOK_SECRET_KEY=$(openssl rand -base64 36)
+        export APP_SECRET_KEY=$(openssl rand -base64 36)
+        ```
+
+        <Warning>
+          Store these values somewhere safe. **Never change `ENCRYPTION_KEY` after your first run** — doing so will permanently break all stored credentials and connections.
+        </Warning>
+      </Step>
+      <Step title="Start the stack">
+        ```bash
+        docker compose up
+        ```
+
+        Automatisch will be available at [http://localhost:3000](http://localhost:3000) once the containers are healthy.
+      </Step>
+    </Steps>
+
+    ### Upgrade with Docker Compose
+
+    Pull the latest changes from the main branch and rebuild the containers.
+
+    ```bash
+    git pull origin main
+    docker compose up --force-recreate --build
+    ```
+  </Tab>
+  <Tab title="Docker">
+    Automatisch runs as two separate services — `main` (the web and API server) and `worker` (the background job processor). Both services use the same Docker image. The `worker` service requires the `WORKER=true` environment variable.
+
+    <Warning>
+      The `.env` file below contains placeholder values. Replace every value with your own before running the containers.
+    </Warning>
+
+    Create a `.env` file with the following variables:
+
+    ```bash
+    APP_ENV=production
+    HOST=
+    PROTOCOL=
+    PORT=
+    ENCRYPTION_KEY=
+    WEBHOOK_SECRET_KEY=
+    APP_SECRET_KEY=
+    POSTGRES_HOST=
+    POSTGRES_PORT=
+    POSTGRES_DATABASE=
+    POSTGRES_USERNAME=
+    POSTGRES_PASSWORD=
+    POSTGRES_ENABLE_SSL=
+    REDIS_HOST=
+    REDIS_PORT=
+    REDIS_USERNAME=
+    REDIS_PASSWORD=
+    REDIS_TLS=
+    ```
+
+    <Tip>
+      Run `openssl rand -base64 36` in your terminal to generate secure random values for `ENCRYPTION_KEY`, `WEBHOOK_SECRET_KEY`, and `APP_SECRET_KEY`.
+    </Tip>
+
+    Start the main service:
+
+    ```bash
+    docker run --env-file=./.env automatischio/automatisch
+    ```
+
+    Start the worker service:
+
+    ```bash
+    docker run --env-file=./.env -e WORKER=true automatischio/automatisch
+    ```
+  </Tab>
+  <Tab title="Render">
+    Deploy Automatisch to [Render](https://render.com) with one click using the official blueprint.
+
+    [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/automatisch/automatisch)
+
+    <Info>
+      The blueprint uses the default Render plan configuration from the `render.yaml` file in the repository. To use a different plan, fork the repository, edit `render.yaml`, and point the Render blueprint at your fork URL.
+    </Info>
+  </Tab>
+</Tabs>
+
+## Environment variables reference
+
+| Variable | Description |
+|---|---|
+| `ENCRYPTION_KEY` | Key used to encrypt stored credentials. Generate with `openssl rand -base64 36`. |
+| `WEBHOOK_SECRET_KEY` | Key used to verify incoming webhook requests. Generate with `openssl rand -base64 36`. |
+| `APP_SECRET_KEY` | Key used to sign application sessions. Generate with `openssl rand -base64 36`. |
+| `POSTGRES_HOST` | Hostname of the PostgreSQL server. |
+| `POSTGRES_PORT` | Port of the PostgreSQL server (default: `5432`). |
+| `POSTGRES_DATABASE` | Name of the PostgreSQL database. |
+| `POSTGRES_USERNAME` | PostgreSQL user. |
+| `POSTGRES_PASSWORD` | PostgreSQL password. |
+| `POSTGRES_ENABLE_SSL` | Set to `true` to enable SSL for the database connection. |
+| `REDIS_HOST` | Hostname of the Redis server. |
+| `REDIS_PORT` | Port of the Redis server (default: `6379`). |
+| `REDIS_USERNAME` | Redis username (if authentication is enabled). |
+| `REDIS_PASSWORD` | Redis password (if authentication is enabled). |
+| `REDIS_TLS` | Set to `true` to enable TLS for the Redis connection. |
+
+For the full list of environment variables, see the [configuration reference](/advanced/configuration).
+
+## Need help?
+
+If you run into problems, report them on [GitHub Issues](https://github.com/automatisch/automatisch/issues) or ask in the [Discord community](https://discord.gg/dJSah9CVrC).

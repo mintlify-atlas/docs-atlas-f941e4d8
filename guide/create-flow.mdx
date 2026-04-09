@@ -1,0 +1,72 @@
+---
+title: "Create a flow"
+description: "Build your first automation workflow in Automatisch by connecting a Typeform trigger to a Slack action."
+---
+
+This guide walks through creating a complete flow from scratch. The example flow fetches new Typeform submissions and posts them to a Slack channel — but the same steps apply to any trigger and action combination.
+
+## Before you start
+
+You need a connection for each app involved in your flow. Set up the Typeform and Slack connections before building the flow.
+
+<Steps>
+  <Step title="Create a Typeform connection">
+    1. Go to **My Apps** in Automatisch and click **Add connection**.
+    2. Select **Typeform** from the app list.
+    3. Automatisch will prompt you for a **Client ID** and **Client Secret** from Typeform. Click the **our documentation** link in the information box for instructions on obtaining these values from Typeform.
+    4. Paste your **Client ID** and **Client Secret** into the fields and click **Submit**.
+  </Step>
+  <Step title="Create a Slack connection">
+    1. Go to **My Apps** and click **Add connection**.
+    2. Select **Slack** from the app list.
+    3. Automatisch will prompt you for an **API Key** and **API Secret** from Slack. Click **our documentation** for instructions on obtaining these values.
+    4. Paste your **API Key** and **API Secret** into the fields and click **Submit**.
+  </Step>
+</Steps>
+
+<Tip>
+  Every app's connection form includes a link to app-specific documentation explaining how to obtain the required credentials.
+</Tip>
+
+## Build the flow
+
+<Steps>
+  <Step title="Create a new flow">
+    Go to the **Flows** page and click **Create flow**. Automatisch creates a new flow with an empty trigger step and an empty action step.
+  </Step>
+  <Step title="Configure the trigger step">
+    The trigger is the first step and defines what starts your flow.
+
+    1. In the trigger step (step 1), open the **Choose an app** dropdown and select **Typeform**.
+    2. Select **New entry** as the trigger event and click **Continue**.
+    3. Select the Typeform connection you created earlier and click **Continue**.
+    4. Select the form you want to monitor for new submissions and click **Continue**.
+    5. Click **Test & Continue** to run a test. Automatisch will fetch the most recent submission from your form. If the data looks correct, proceed to the action step.
+  </Step>
+  <Step title="Configure the action step">
+    The action step defines what happens each time the trigger fires.
+
+    1. In the action step (step 2), open the **Choose an app** dropdown and select **Slack**.
+    2. Select **Send a message to channel** as the action event and click **Continue**.
+    3. Select your Slack connection and click **Continue**.
+    4. Select the channel where messages should be posted.
+    5. Write the message content. You can insert variables from the trigger step — for example, the respondent's name or their answers — by selecting them from the variable picker.
+    6. Set **Send as a bot** to **Yes** and enter a name for the bot.
+    7. Click **Continue**.
+    8. Click **Test & Continue**. If a message appears in the selected Slack channel, the action is working correctly.
+  </Step>
+  <Step title="Publish the flow">
+    Click **Publish** to activate the flow.
+
+    Once published:
+    - The flow executes automatically whenever the trigger event fires.
+    - For poll-based triggers (like Typeform), Automatisch checks for new data every 15 minutes.
+    - You cannot edit a published flow. To make changes, unpublish the flow first, make your edits, then republish.
+  </Step>
+</Steps>
+
+## Next steps
+
+- [Key concepts](/guide/key-concepts) — Learn more about apps, connections, flows, and steps.
+- [Available apps](/guide/available-apps) — Browse all supported integrations.
+- [Environment variables](/advanced/configuration#environment-variables) — Configure Automatisch for production.

@@ -1,0 +1,85 @@
+---
+title: 'Telemetry'
+description: 'Learn what anonymous usage data Automatisch collects, what it never collects, and how to disable telemetry entirely.'
+---
+
+Automatisch includes a built-in telemetry system that sends anonymous usage data to the Automatisch team. This data helps the team understand how the product is used, identify areas for improvement, and prioritize features.
+
+Telemetry is enabled by default and can be disabled with a single environment variable.
+
+<Info>
+Automatisch is fully open source, and so is the telemetry implementation. You can read the exact code that collects and sends data in the repository at [`packages/backend/src/helpers/telemetry/index.js`](https://github.com/automatisch/automatisch/blob/main/packages/backend/src/helpers/telemetry/index.js). If you have suggestions for changes to what is collected, open an issue or pull request.
+</Info>
+
+---
+
+## What is collected
+
+Automatisch collects the following categories of anonymous data:
+
+<AccordionGroup>
+  <Accordion title="Flow, step, and connection metadata">
+    Structural information about your flows and steps — such as counts, which app integrations are in use, and connection state. No credentials, API keys, or payload data are included.
+  </Accordion>
+  <Accordion title="Execution metadata">
+    Information about flow runs — such as execution counts, status (success or failure), and timing. Payload contents and any data processed by the flow are never sent.
+  </Accordion>
+  <Accordion title="Organization and instance identifiers">
+    Random UUIDs generated when you first install Automatisch. These are not linked to any personal information and are used only to estimate how many distinct instances and organizations are running Automatisch.
+  </Accordion>
+  <Accordion title="Diagnostic information">
+    System-level context collected every six hours:
+
+    - Automatisch version
+    - Service type (`main` or `worker`)
+    - Operating system type and version
+    - CPU and memory information
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## What is never collected
+
+Automatisch explicitly excludes the following from all telemetry:
+
+- Personal information of any kind
+- Credentials for third-party services (API keys, OAuth tokens, etc.)
+- Email addresses or passwords used to log in to Automatisch
+- Error payloads or any data flowing through your flows
+
+---
+
+## How data collection works
+
+Telemetry events are sent when specific actions occur — for example, when a flow is created or when a connection is established. In addition to these event-triggered reports, diagnostic information is collected automatically every six hours while the service is running.
+
+No data is sent in real time during flow execution; only metadata about executions is reported.
+
+---
+
+## Disabling telemetry
+
+Set `TELEMETRY_ENABLED` to `false` in your `docker-compose.yml` to stop all telemetry reporting.
+
+```yaml docker-compose.yml
+services:
+  main:
+    environment:
+      - TELEMETRY_ENABLED=false
+      # ... other variables
+  worker:
+    environment:
+      - TELEMETRY_ENABLED=false
+      # ... other variables
+```
+
+After saving the file, restart the services for the change to take effect:
+
+```bash
+docker compose down && docker compose up -d
+```
+
+<Tip>
+You need to set `TELEMETRY_ENABLED=false` in both the `main` and `worker` service definitions. Omitting it from either service will leave telemetry active for that service.
+</Tip>

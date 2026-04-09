@@ -1,0 +1,314 @@
+---
+title: "Global variable ($)"
+description: "The $ object passed to every trigger and action run function — HTTP client, auth data, step parameters, flow context, and output methods."
+---
+
+<Info>
+  This section is best read from beginning to end. If you haven't already, start with the [Build integrations overview](/build-integrations/overview).
+</Info>
+
+Every trigger `run` function and action `run` function receives a single argument: the `$` global variable. It is a plain JavaScript object assembled by Automatisch at execution time and scoped to the current flow, step, and connection.
+
+```javascript
+async run($) {
+  // $ is available here
+}
+```
+
+`$` provides everything your integration code needs: an authenticated HTTP client, the connection's stored credentials, the parameters the user configured for this step, flow and execution identifiers, and methods to emit output data.
+
+---
+
+## $.http
+
+An [Axios](https://axios-http.com) HTTP client pre-configured for the app.
+
+- **Base URL** is set to the app's `apiBaseUrl`.
+- Any `beforeRequest` hooks defined on the app are applied automatically (for example, attaching an `Authorization` header).
+- Responses with status codes outside the 2xx range throw an error automatically. You do not need to check `response.status` manually — Automatisch records the error and surfaces it on the execution details page.
+
+```javascript
+// GET request — base URL is prepended automatically
+const response = await $.http.get('/v1/images/search', {
+  params: { order: 'DESC' },
+  headers: { 'x-api-key': $.auth.data.apiKey },
+});
+
+// POST request
+const response = await $.http.post('/chat.postMessage', {
+  channel: $.step.parameters.channel,
+  text: $.step.parameters.message,
+});
+```
+
+Supports all standard Axios methods: `$.http.get`, `$.http.post`, `$.http.put`, `$.http.patch`, `$.http.delete`.
+
+---
+
+## $.auth
+
+Provides access to the connection's stored credentials and a method to update them.
+
+### $.auth.data
+
+The connection's stored credentials as a plain object. Values were saved by `$.auth.set` during the authentication flow and are decrypted by Automatisch before being made available here.
+
+```javascript
+$.auth.data;
+// { accessToken: 'ghp_...', tokenType: 'bearer' }
+
+// Access individual values
+const token = $.auth.data.accessToken;
+```
+
+### $.auth.set(data)
+
+Updates the stored credentials for the connection. Accepts an object of key-value pairs. The new values are merged with the existing data — existing keys that are not present in `data` are preserved.
+
+Automatisch encrypts the data before writing it to the database.
+
+```javascript
+await $.auth.set({
+  accessToken: newToken,
+  refreshToken: newRefreshToken,
+  expiresAt: Date.now() + 3600 * 1000,
+});
+
+// $.auth.data is updated immediately after the call
+```
+
+<Note>
+  `$.auth.set` is most commonly used in OAuth refresh flows, where you need to store a new access token after the old one expires.
+</Note>
+
+---
+
+## $.step
+
+Contains context for the current step in the flow.
+
+### $.step.parameters
+
+An object containing the values the user entered for this step's arguments in the Automatisch UI. Keys match the `key` field of each argument defined in `defineTrigger` or `defineAction`.
+
+```javascript
+// In the Slack "Send a message to channel" action:
+const channel = $.step.parameters.channel;   // e.g. 'C012AB3CD'
+const message = $.step.parameters.message;   // e.g. 'Hello!'
+
+await $.http.post('/chat.postMessage', { channel, text: message });
+```
+
+Returns an empty object (`{}`) if no parameters have been configured.
+
+---
+
+## $.flow
+
+Contains identifiers for the flow that is currently executing.
+
+### $.flow.id
+
+The unique identifier of the flow (UUID string).
+
+```javascript
+console.log($.flow.id);
+// '3f7b2e1a-...'
+```
+
+### $.flow.remoteWebhookId
+
+For webhook triggers, the ID of the webhook registered with the third-party service. Set this using `$.flow.setRemoteWebhookId` after registering a webhook so Automatisch can delete it when the flow is unpublished.
+
+### $.flow.setRemoteWebhookId(id)
+
+Stores the remote webhook ID on the flow record. Only available on webhook-type triggers.
+
+```javascript
+const webhook = await $.http.post('/hooks', {
+  url: $.webhookUrl,
+  events: ['issues'],
+});
+
+await $.flow.setRemoteWebhookId(webhook.data.id);
+```
+
+---
+
+## $.execution
+
+Contains context for the current execution.
+
+### $.execution.id
+
+The unique identifier of this execution (UUID string).
+
+```javascript
+console.log($.execution.id);
+// 'a1b2c3d4-...'
+```
+
+### $.execution.testRun
+
+`true` when the step is being run from the test panel in the UI, `false` during a live execution. Use this to adjust behaviour during testing if needed.
+
+### $.execution.exit()
+
+Stops the current execution immediately without marking it as an error. Throws an internal `EarlyExitError`.
+
+```javascript
+if (!$.step.parameters.channel) {
+  $.execution.exit(); // stop cleanly if required parameter is missing
+}
+```
+
+---
+
+## $.pushTriggerItem(item)
+
+Emits a single trigger item to be processed by the flow. Call this once for each new event you find. Automatisch deduplicates items using `meta.internalId` — items whose `internalId` was already seen in a recent execution are silently skipped.
+
+```javascript
+$.pushTriggerItem({
+  raw: issue,           // the full data object from the API
+  meta: {
+    internalId: String(issue.id),  // stable unique ID for deduplication
+  },
+});
+```
+
+**Parameters:**
+
+| Field | Type | Description |
+|---|---|---|
+| `raw` | object | The data object from the third-party API. This is what downstream steps receive. |
+| `meta.internalId` | string | A stable, unique identifier for this event. Used to detect already-processed items. Must be a string. |
+
+**Real example — GitHub new issues trigger:**
+
+```javascript
+const response = await $.http.get('/repos/owner/repo/issues', {
+  params: { state: 'all', sort: 'created', direction: 'desc' },
+});
+
+for (const issue of response.data) {
+  $.pushTriggerItem({
+    raw: issue,
+    meta: {
+      internalId: String(issue.id),
+    },
+  });
+}
+```
+
+<Warning>
+  During a test run, `pushTriggerItem` throws an `EarlyExitError` after the first item is pushed (except for the built-in `webhook` and `forms` apps). This stops the trigger after one sample item — normal behaviour in the test panel.
+</Warning>
+
+---
+
+## $.setActionItem(item)
+
+Sets the output of the current action step. Downstream steps can reference fields from this output using variable syntax.
+
+```javascript
+$.setActionItem({
+  raw: response.data,   // the response payload from the API
+});
+```
+
+**Parameters:**
+
+| Field | Type | Description |
+|---|---|---|
+| `raw` | object | The data object to expose as the step's output. |
+
+**Real example — Slack "Send a message to channel" action:**
+
+```javascript
+const response = await $.http.post('/chat.postMessage', {
+  channel: $.step.parameters.channel,
+  text: $.step.parameters.message,
+});
+
+$.setActionItem({
+  raw: response.data,
+});
+```
+
+---
+
+## $.webhookUrl
+
+The URL Automatisch has assigned to receive webhook events for this step. Available on webhook-type triggers.
+
+```javascript
+console.log($.webhookUrl);
+// 'https://your-instance.com/webhooks/flows/3f7b2e1a-.../trigger'
+
+// Register it with the third-party service
+await $.http.post('/hooks', {
+  url: $.webhookUrl,
+  events: ['push'],
+});
+```
+
+---
+
+## $.request
+
+Available on **webhook triggers** only. Contains the incoming HTTP request that triggered the flow.
+
+```javascript
+$.request.body;    // parsed request body (object)
+$.request.headers; // request headers (object)
+$.request.query;   // query string parameters (object)
+```
+
+Use `$.request.body` inside a webhook trigger's `run` function to access the payload sent by the third-party service:
+
+```javascript
+async run($) {
+  $.pushTriggerItem({
+    raw: $.request.body,
+    meta: {
+      internalId: $.request.body.event_id,
+    },
+  });
+}
+```
+
+---
+
+## $.app
+
+The app definition object. Provides access to the app's configured metadata.
+
+```javascript
+$.app.baseUrl;      // 'https://github.com'
+$.app.apiBaseUrl;   // 'https://api.github.com'
+$.app.auth.fields;  // array of auth field definitions
+```
+
+---
+
+## $.datastore
+
+A simple key-value store scoped to the current flow. Useful for persisting state between executions (for example, tracking a cursor or timestamp).
+
+### $.datastore.get({ key })
+
+Retrieves a stored value.
+
+```javascript
+const result = await $.datastore.get({ key: 'lastSyncedAt' });
+const lastSyncedAt = result.value; // null if not yet set
+```
+
+### $.datastore.set({ key, value })
+
+Stores a value. Creates the entry if it does not exist, or updates it if it does.
+
+```javascript
+await $.datastore.set({ key: 'lastSyncedAt', value: Date.now() });
+```
